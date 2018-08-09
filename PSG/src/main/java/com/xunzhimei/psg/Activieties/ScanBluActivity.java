@@ -206,7 +206,7 @@ public class ScanBluActivity extends AppCompatActivity
         AlertDialog.Builder builder = new AlertDialog.Builder(ScanBluActivity.this);  //先得到构造器
         builder.setTitle(mLeDevices.get(potion).getName()); //设置标题
         builder.setMessage("这是您想要设置的安全设备吗？"); //设置内容
-        builder.setIcon(R.mipmap.ic_launcher);//设置图标，图片id即可
+        builder.setIcon(R.drawable.ic_launcher);//设置图标，图片id即可
         builder.setPositiveButton("确定", new DialogInterface.OnClickListener()
         { //设置确定按钮
             @Override

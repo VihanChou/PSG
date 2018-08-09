@@ -2,22 +2,28 @@ package com.xunzhimei.psg.Activieties;
 
 import android.Manifest;
 import android.annotation.TargetApi;
-import android.app.Activity;
+
 import android.app.AlertDialog;
-import android.app.Dialog;
-import android.app.NotificationChannel;
+//import android.app.NotificationChannel;
 import android.app.NotificationManager;
 
+import android.content.ComponentName;
 import android.content.Context;
 import android.content.DialogInterface;
 import android.content.Intent;
+import android.content.ServiceConnection;
 import android.content.SharedPreferences;
+import android.net.Uri;
 import android.os.Build;
+
+import android.os.IBinder;
+import android.provider.Settings;
 import android.support.annotation.NonNull;
 import android.support.v7.app.ActionBar;
 import android.support.v7.app.AppCompatActivity;
 import android.os.Bundle;
 
+import android.util.Log;
 import android.view.Menu;
 import android.view.MenuItem;
 import android.view.View;
@@ -27,30 +33,36 @@ import android.widget.TextView;
 import android.widget.Toast;
 
 import com.xunzhimei.psg.R;
+import com.xunzhimei.psg.Service.BLEService;
 import com.xunzhimei.psg.Utils.Constants;
 
-import java.util.Date;
 import java.util.List;
 
-import pub.devrel.easypermissions.AppSettingsDialog;
 import pub.devrel.easypermissions.EasyPermissions;
+
 
 public class MainActivity extends AppCompatActivity implements EasyPermissions.PermissionCallbacks
 {
-    //时间差计算相关
-    Date startDate = new Date();
-
     //Views
     private android.support.v7.widget.Toolbar mToolBar;
     private boolean mBoot_Flag = false;
     private Button mBt_bootCheck;
     private ImageView mIv_confiState;
     private TextView mTv_confiState;
-    public static final int WRITE_EXTERNAL_STORAGE = 100;
-
     private SharedPreferences mSharedPreferences;
-    private String[] mPerms = {Manifest.permission.ACCESS_NOTIFICATION_POLICY};
-    private String mNowPermissioning;
+
+    private String[] permissions = {
+            Manifest.permission.ACCESS_COARSE_LOCATION,
+            Manifest.permission.RECORD_AUDIO,
+            Manifest.permission.READ_EXTERNAL_STORAGE,
+            Manifest.permission.CAMERA};
+    private final int REQUEST_ENABLE_PERMISSION = 10;
+
+
+    //绑定服务
+    private ServiceConnection mServiceConnection;
+    private BLEService.My4Activity mControlBle;
+
 
     @Override
     protected void onCreate(Bundle savedInstanceState)
@@ -63,38 +75,52 @@ public class MainActivity extends AppCompatActivity implements EasyPermissions.P
         init();
         initViews();
         initUI();
-        System.out.println("onCreate----------" + startDate.getTime());
+        askPermission();
+        SpeciaPermission();
     }
 
-    @TargetApi(Build.VERSION_CODES.O)
-    private void createNotificationChannel(String channelId, String channelName, int importance)
+    private void SpeciaPermission()
     {
-        NotificationChannel channel = new NotificationChannel(channelId, channelName, importance);
-        NotificationManager notificationManager = (NotificationManager) getSystemService(
-                NOTIFICATION_SERVICE);
-        notificationManager.createNotificationChannel(channel);
+        Intent intent = new Intent(Settings.ACTION_MANAGE_OVERLAY_PERMISSION);
+        intent.setData(Uri.parse("package:" + getPackageName()));
+        startActivityForResult(intent, 100);
     }
+
+
+//    @TargetApi(Build.VERSION_CODES.O)
+//    private void createNotificationChannel(String channelId, String channelName, int importance)
+//    {
+//        NotificationChannel channel = new NotificationChannel(channelId, channelName, importance);
+//        NotificationManager notificationManager = (NotificationManager) getSystemService(NOTIFICATION_SERVICE);
+//        notificationManager.createNotificationChannel(channel);
+//    }
 
     private void init()
     {
         //第一个参数是保存在哪一个xml文件中，第二个参数是操作模式，一般选择 MODE_PRIVATE
         mSharedPreferences = getSharedPreferences(Constants.getSPFILENAME(), Context.MODE_PRIVATE);
 
-        //通知版本适配，创建通知渠道
-        if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.O)
+        //开启服务   为了不让Activity绑定服务后解绑时候的服务销毁发生
+        Intent in = new Intent(getApplicationContext(), BLEService.class);
+        startService(in);
+
+        Intent intent = new Intent(this, BLEService.class);
+        mServiceConnection = new ServiceConnection()
         {
-            //创建了两个通知渠道
-            String channelId = "psg_ble_service";
-            String channelName = "安全服务通知";
-            int importance = NotificationManager.IMPORTANCE_HIGH;
-            createNotificationChannel(channelId, channelName, importance);
+            @Override
+            public void onServiceConnected(ComponentName componentName, IBinder iBinder)
+            {
+                System.out.println("MainActivity-->" + "onServiceConnected" + "");
+                mControlBle = (BLEService.My4Activity) iBinder;
+            }
 
-            channelId = "subscribe";
-            channelName = "订阅消息";
-            importance = NotificationManager.IMPORTANCE_DEFAULT;
-            createNotificationChannel(channelId, channelName, importance);
-
-        }
+            @Override
+            public void onServiceDisconnected(ComponentName componentName)
+            {
+                System.out.println("MainActivity-->" + "onServiceDisconnected" + "");
+            }
+        };
+        bindService(intent, mServiceConnection, BIND_AUTO_CREATE);
     }
 
     private void initUI()
@@ -175,24 +201,28 @@ public class MainActivity extends AppCompatActivity implements EasyPermissions.P
         super.onStart();
     }
 
+    //-----------------------------------------------------权限申请相关----------------------------------------------------------------
 
-    public void bt_test(View view)
+    public void askPermission()
     {
-        String[] params = {Manifest.permission.WRITE_EXTERNAL_STORAGE};
-        mNowPermissioning = params[0];
 
-
-        if (EasyPermissions.hasPermissions(this, mNowPermissioning))
+        //当手机安卓版本大于等于23时，才有必要去判断权限是否去获取
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M)
         {
-            System.out.println("MainActivity-->" + "bt_test" + "权限获取成功");
-        }
-        else
-        {
-            EasyPermissions.requestPermissions(this, "需要读写本地权限", WRITE_EXTERNAL_STORAGE, mNowPermissioning);
+            //权限是否授权
+            if (!EasyPermissions.hasPermissions(this, permissions))
+            {
+                EasyPermissions.requestPermissions(this, "请打开所有必要的权限",
+                        REQUEST_ENABLE_PERMISSION, permissions);
+            }
+            else
+            {
+//                Toast.makeText(this, "已授权", Toast.LENGTH_SHORT).show();
+                System.out.println("MainActivity-->" + "askPermission" + "已授权");
+            }
         }
 
     }
-
 
     @Override
     public void onRequestPermissionsResult(int requestCode, @NonNull String[] permissions, @NonNull int[] grantResults)
@@ -201,40 +231,117 @@ public class MainActivity extends AppCompatActivity implements EasyPermissions.P
         EasyPermissions.onRequestPermissionsResult(requestCode, permissions, grantResults, this);
     }
 
+    //下面两个方法是实现EasyPermissions的EasyPermissions.PermissionCallbacks接口
+    //分别返回授权成功和失败的权限
     @Override
     public void onPermissionsGranted(int requestCode, List<String> perms)
     {
-        //如果checkPerm方法，没有注解AfterPermissionGranted，也可以在这里调用该方法。
+
+        Log.i("ble", "获取成功的权限" + perms);
     }
 
     @Override
     public void onPermissionsDenied(int requestCode, List<String> perms)
     {
-
-        //当用户不允许在当前界面提示快捷获取权限方式的时候
         if (EasyPermissions.somePermissionPermanentlyDenied(this, perms))
         {
-            //这里需要重新设置Rationale和title，否则默认是英文格式
-            new AppSettingsDialog.Builder(this)
-                    .setRationale("没有该权限，此应用程序无法正常工作。点击确认，打开应用设置界面以修改应用权限，点击取消，退出软件")
-                    .setTitle("您需要让我们的App具有以下权限" + perms)
-                    .build()
-                    .show();
+
+            new AlertDialog.Builder(this)
+                    .setTitle("请打开所有必要权限")
+                    .setMessage("拒绝开启权限可能会导致程序某些功能不能正常使用，点击确认进入权限设置界面，点击退出则退出程序")
+                    .setPositiveButton("确定", new DialogInterface.OnClickListener()
+                    {
+                        @Override
+                        public void onClick(DialogInterface dialog, int which)
+                        {
+                            Uri packageURI = Uri.parse("package:" + MainActivity.this.getPackageName());
+                            Intent intent = new Intent(Settings.ACTION_APPLICATION_DETAILS_SETTINGS, packageURI);
+                            startActivityForResult(intent, REQUEST_ENABLE_PERMISSION);
+                        }
+                    })
+                    .setNegativeButton("退出", new DialogInterface.OnClickListener()
+                    {
+                        @Override
+                        public void onClick(DialogInterface dialog, int which)
+                        {
+                            finish();
+                        }
+                    }).setCancelable(false).show();
         }
-        else//用户仅仅拒绝了权限
+        else
         {
-            //再次申请权限
-            EasyPermissions.requestPermissions(this, "需要读写本地权限", WRITE_EXTERNAL_STORAGE, mNowPermissioning);
+            if (!EasyPermissions.hasPermissions(this, permissions))
+            {
+
+                EasyPermissions.requestPermissions(this, "请打开所有权限，否则程序将无法正常运行",
+                        REQUEST_ENABLE_PERMISSION, permissions);
+            }
+            else
+            {
+                Toast.makeText(this, "已授权", Toast.LENGTH_SHORT).show();
+            }
         }
 
+        Log.i("ble", "获取失败的权限" + perms);
+    }
+
+    @Override
+    public void onActivityResult(int requestCode, int resultCode, Intent data)
+    {
+
+
+        super.onActivityResult(requestCode, resultCode, data);
+        if (requestCode == REQUEST_ENABLE_PERMISSION)
+        {
+            if (!EasyPermissions.hasPermissions(this, permissions))
+            {
+
+                EasyPermissions.requestPermissions(this, "请打开所有权限，否则程序将无法正常运行",
+                        REQUEST_ENABLE_PERMISSION, permissions);
+            }
+            else
+            {
+                Toast.makeText(this, "已授权", Toast.LENGTH_SHORT).show();
+            }
+        }
     }
 
 
-    public void bt_getPermission(View view)
+    public void bt_con2ble(View view)
     {
-//        dialog.show();
-//        normalDialog.show();
+//        mControlBle.doMethod_startPush();
+        mControlBle.doMethod_Bleconnection();
+    }
 
+    public void bt_alarm(View view)
+    {
+//        mControlBle.doMethod_stopPush();
+        mControlBle.doMethod_BLEAlarm();
+    }
+
+    public void bt_disConnect(View view)
+    {
+//        mControlBle.doMethod_switchCamera();
+        mControlBle.doMethod_Bledisconnect();
+    }
+
+    public void bt_disalarm(View view)
+    {
+        mControlBle.doMethod_BLECancleAlarm();
+    }
+
+
+    @Override
+    public void finish()
+    {
+        Intent intent = new Intent(this, BLEService.class);
+        unbindService(mServiceConnection);
+        super.finish();
+    }
+
+    public void bt_stopPush(View view)
+    {
+        mControlBle.doMethod_stopPush();
     }
 }
 

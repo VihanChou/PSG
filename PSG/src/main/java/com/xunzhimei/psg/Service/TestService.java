@@ -2,7 +2,7 @@ package com.xunzhimei.psg.Service;
 
 import android.annotation.TargetApi;
 import android.app.Notification;
-import android.app.NotificationChannel;
+//import android.app.NotificationChannel;
 import android.app.NotificationManager;
 import android.app.PendingIntent;
 import android.app.Service;
@@ -40,43 +40,7 @@ public class TestService extends Service
     @Override
     public void onCreate()
     {
-        //安卓通知的版本适配
-        if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.O)
-        {
-            NotificationManager manager = (NotificationManager) getSystemService(NOTIFICATION_SERVICE);
-            notification = new NotificationCompat.Builder(this, "psg_ble_service")//此处的chat为我们定义的通知ID
-                    .setContentTitle("安全服务正在运行")
-                    .setContentText("您的安全，我来守候")
-                    .setWhen(System.currentTimeMillis())
-                    .setSmallIcon(R.drawable.ic_launcher)
-                    .setLargeIcon(BitmapFactory.decodeResource(getResources(), R.drawable.ic_launcher))
-                    .build();
-//            manager.notify(1, notification);
-            //调用startForeground()方法就可以让MyService变成一个前台Service，并会将通知的图片显示出来。
-            // 参数一：唯一的通知标识；参数二：通知消息。
-        }
-        else
-        {
-            Notification.Builder builder = null; //获取一个Notification构造器
-            builder = new Notification.Builder(this.getApplicationContext());
-            Intent nfIntent = new Intent(this, MainActivity.class);//点击通知的跳转Activity
 
-            builder.setContentIntent(PendingIntent.getActivity(this, 0, nfIntent, 0)) // 设置PendingIntent
-                    .setLargeIcon(BitmapFactory.decodeResource(this.getResources(),
-                            R.mipmap.ic_launcher_round)) // 设置下拉列表中的图标(大图标)
-                    .setContentTitle("安全服务正在运行") // 设置下拉列表里的标题
-                    .setSmallIcon(R.mipmap.ic_launcher) // 设置状态栏内的小图标
-                    .setContentText("您的安全，我来守候")      // 设置上下文内容
-                    .setWhen(System.currentTimeMillis()); // 设置该通知发生的时间
-            Notification notification = builder.build(); // 获取构建好的Notification
-            notification.defaults = Notification.DEFAULT_SOUND; //设置为默认的声音
-
-            //调用startForeground()方法就可以让MyService变成一个前台Service，并会将通知的图片显示出来。
-            // 参数一：唯一的通知标识；参数二：通知消息。
-//            startForeground(1, notification);
-        }
-
-        startForeground(1, notification);
 
         super.onCreate();
     }
