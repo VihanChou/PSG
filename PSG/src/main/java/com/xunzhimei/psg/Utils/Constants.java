@@ -28,27 +28,25 @@ public class Constants
     private static String SEND_BLE_DATA_SERVICE_UUID = "00001802-0000-1000-8000-00805f9b34fb";
     private static String SEND_BLE_DATA_CHAREC_UUID = "00002a06-0000-1000-8000-00805f9b34fb";
 
+
+    //---------------------------------getter方法------------------------------
+
     public static String getReceiBleDataCharecUuid()
     {
         return RECEI_BLE_DATA_CHAREC_UUID;
     }
-
     public static String getSendBleDataServiceUuid()
     {
         return SEND_BLE_DATA_SERVICE_UUID;
     }
-
     public static String getSendBleDataCharecUuid()
     {
         return SEND_BLE_DATA_CHAREC_UUID;
     }
-
-
     public static String getMATCHDEVICE_NAME()
     {
         return MATCHDEVICE_NAME;
     }
-
     public static String getMATCHDEVICE_MAC()
     {
         return MATCHDEVICE_MAC;

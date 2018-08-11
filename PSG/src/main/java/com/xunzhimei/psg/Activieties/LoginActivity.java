@@ -162,7 +162,7 @@ public class LoginActivity extends AppCompatActivity implements OnClickListener
         mTv_aboutUs = (TextView) findViewById(R.id.tv_aboutUs);
         mTv_aboutUs.setOnClickListener(this);
 
-        System.out.println("LoginActivity-->"+"initViews"+android.os.Build.VERSION.SDK_INT);
+        System.out.println("LoginActivity-->" + "initViews" + android.os.Build.VERSION.SDK_INT);
 
     }
 

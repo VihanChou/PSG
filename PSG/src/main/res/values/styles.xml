@@ -9,4 +9,14 @@
         <item name="colorAccent">@color/colorAccent</item>
     </style>
 
+    <!--最开始的欢迎界面-->
+    <style name="AppTheme.NoActionBarWithBackGround">
+        <item name="windowActionBar">false</item>
+        <item name="windowNoTitle">true</item>
+        <item name="android:windowFullscreen">true</item>
+        <item name="android:windowDrawsSystemBarBackgrounds">true</item>
+        <item name="android:windowBackground">@drawable/bac_welcome</item>
+        <item name="android:windowIsTranslucent">true</item>
+    </style>
+
 </resources>

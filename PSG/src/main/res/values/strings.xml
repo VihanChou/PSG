@@ -1,5 +1,5 @@
 <resources>
-    <string name="app_name">PSG</string>
+    <string name="app_name">个人安全守护</string>
     <string name="title_activity_login">Sign in</string>
 
     <!-- Strings related to login -->

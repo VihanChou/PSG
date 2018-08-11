@@ -45,8 +45,6 @@ import java.util.List;
 
 public class ScanBluActivity extends AppCompatActivity
 {
-
-
     //蓝牙相关
     private BluetoothAdapter mBluetoothAdapter;
     private BluetoothManager mBluetoothManager;

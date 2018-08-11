@@ -1,11 +1,9 @@
 package com.xunzhimei.psg.Activieties;
 
 import android.Manifest;
-import android.annotation.TargetApi;
 
 import android.app.AlertDialog;
 //import android.app.NotificationChannel;
-import android.app.NotificationManager;
 
 import android.content.ComponentName;
 import android.content.Context;
@@ -40,7 +38,12 @@ import java.util.List;
 
 import pub.devrel.easypermissions.EasyPermissions;
 
-
+/**
+ * Class  :MainActivity
+ * Author :created by Vihan
+ * Email  :vihanmy@google.com
+ * Notes  :
+ **/
 public class MainActivity extends AppCompatActivity implements EasyPermissions.PermissionCallbacks
 {
     //Views
@@ -51,6 +54,7 @@ public class MainActivity extends AppCompatActivity implements EasyPermissions.P
     private TextView mTv_confiState;
     private SharedPreferences mSharedPreferences;
 
+    //动态权限申请
     private String[] permissions = {
             Manifest.permission.ACCESS_COARSE_LOCATION,
             Manifest.permission.RECORD_AUDIO,
@@ -61,9 +65,10 @@ public class MainActivity extends AppCompatActivity implements EasyPermissions.P
 
     //绑定服务
     private ServiceConnection mServiceConnection;
-    private BLEService.My4Activity mControlBle;
+    private BLEService.channel2Activity mControlBle;
 
 
+    //-----------------------------------------------Activity固有方法-----------------------------------------
     @Override
     protected void onCreate(Bundle savedInstanceState)
     {
@@ -76,16 +81,74 @@ public class MainActivity extends AppCompatActivity implements EasyPermissions.P
         initViews();
         initUI();
         askPermission();
-        SpeciaPermission();
+//        SpeciaPermission();
     }
 
-    private void SpeciaPermission()
+    @Override
+    public void onActivityResult(int requestCode, int resultCode, Intent data)
     {
-        Intent intent = new Intent(Settings.ACTION_MANAGE_OVERLAY_PERMISSION);
-        intent.setData(Uri.parse("package:" + getPackageName()));
-        startActivityForResult(intent, 100);
+        super.onActivityResult(requestCode, resultCode, data);
+        if (requestCode == REQUEST_ENABLE_PERMISSION)
+        {
+            if (!EasyPermissions.hasPermissions(this, permissions))
+            {
+
+                EasyPermissions.requestPermissions(this, "请打开所有权限，否则程序将无法正常运行",
+                        REQUEST_ENABLE_PERMISSION, permissions);
+            }
+            else
+            {
+                Toast.makeText(this, "已授权", Toast.LENGTH_SHORT).show();
+            }
+        }
     }
 
+    @Override
+    public void finish()
+    {
+        Intent intent = new Intent(this, BLEService.class);
+        unbindService(mServiceConnection);
+        super.finish();
+    }
+
+
+    //该方法用于向  setSupportActionBar(mToolBar);  设置的ToolBar中设置菜单
+    @Override
+    public boolean onCreateOptionsMenu(Menu menu)
+    {
+        getMenuInflater().inflate(R.menu.menu_4_mainactivity, menu);
+        return true;
+    }
+
+    //Actionbar  点击事件
+    @Override
+    public boolean onOptionsItemSelected(MenuItem item)
+    {
+        switch (item.getItemId())
+        {
+            case R.id.bt_ScanBlu:
+                Intent intent = new Intent(getApplicationContext(), ScanBluActivity.class);
+                startActivity(intent);
+                break;
+
+            case R.id.bt_Help:
+                Intent ntent = new Intent(getApplicationContext(), ScanBluActivity.class);
+                startActivity(ntent);
+                break;
+        }
+        return super.onOptionsItemSelected(item);
+    }
+
+
+    @Override
+    protected void onStart()
+    {
+        initUI();
+        super.onStart();
+    }
+
+
+    //-----------------------------------------------初始化-----------------------------------------
 
 //    @TargetApi(Build.VERSION_CODES.O)
 //    private void createNotificationChannel(String channelId, String channelName, int importance)
@@ -111,7 +174,7 @@ public class MainActivity extends AppCompatActivity implements EasyPermissions.P
             public void onServiceConnected(ComponentName componentName, IBinder iBinder)
             {
                 System.out.println("MainActivity-->" + "onServiceConnected" + "");
-                mControlBle = (BLEService.My4Activity) iBinder;
+                mControlBle = (BLEService.channel2Activity) iBinder;
             }
 
             @Override
@@ -148,61 +211,26 @@ public class MainActivity extends AppCompatActivity implements EasyPermissions.P
             actionBar.setDisplayHomeAsUpEnabled(true);
         }
 
-        mBt_bootCheck = (Button) findViewById(R.id.bt_bootcheck);
         mTv_confiState = (TextView) findViewById(R.id.tv_confiState);
         mIv_confiState = (ImageView) findViewById(R.id.iv_confiState);
     }
 
-    //该方法用于向  setSupportActionBar(mToolBar);  设置的ToolBar中设置菜单
-    @Override
-    public boolean onCreateOptionsMenu(Menu menu)
-    {
-        getMenuInflater().inflate(R.menu.menu_4_mainactivity, menu);
-        return true;
-    }
+//    public void bt_BootCheck(View view)
+//    {
+//        if (mBoot_Flag)
+//        {
+//            mBt_bootCheck.setBackground(getDrawable(R.drawable.mainbuttonshape));
+//        }
+//        else
+//        {
+//            mBt_bootCheck.setBackground(getDrawable(R.drawable.mainbuttonshapegreen));
+//        }
+//        mBoot_Flag = !mBoot_Flag;
+//
+//    }
 
-    //Actionbar  点击事件
-    @Override
-    public boolean onOptionsItemSelected(MenuItem item)
-    {
-        switch (item.getItemId())
-        {
-            case R.id.bt_ScanBlu:
-                Intent intent = new Intent(getApplicationContext(), ScanBluActivity.class);
-                startActivity(intent);
-                break;
-
-            case R.id.bt_Help:
-                Intent ntent = new Intent(getApplicationContext(), ScanBluActivity.class);
-                startActivity(ntent);
-                break;
-        }
-        return super.onOptionsItemSelected(item);
-    }
-
-    public void bt_BootCheck(View view)
-    {
-        if (mBoot_Flag)
-        {
-            mBt_bootCheck.setBackground(getDrawable(R.drawable.mainbuttonshape));
-        }
-        else
-        {
-            mBt_bootCheck.setBackground(getDrawable(R.drawable.mainbuttonshapegreen));
-        }
-        mBoot_Flag = !mBoot_Flag;
-
-    }
-
-    @Override
-    protected void onStart()
-    {
-        initUI();
-        super.onStart();
-    }
 
     //-----------------------------------------------------权限申请相关----------------------------------------------------------------
-
     public void askPermission()
     {
 
@@ -224,6 +252,13 @@ public class MainActivity extends AppCompatActivity implements EasyPermissions.P
 
     }
 
+    private void SpeciaPermission()
+    {
+        Intent intent = new Intent(Settings.ACTION_MANAGE_OVERLAY_PERMISSION);
+        intent.setData(Uri.parse("package:" + getPackageName()));
+        startActivityForResult(intent, 100);
+    }
+
     @Override
     public void onRequestPermissionsResult(int requestCode, @NonNull String[] permissions, @NonNull int[] grantResults)
     {
@@ -236,7 +271,6 @@ public class MainActivity extends AppCompatActivity implements EasyPermissions.P
     @Override
     public void onPermissionsGranted(int requestCode, List<String> perms)
     {
-
         Log.i("ble", "获取成功的权限" + perms);
     }
 
@@ -285,27 +319,8 @@ public class MainActivity extends AppCompatActivity implements EasyPermissions.P
         Log.i("ble", "获取失败的权限" + perms);
     }
 
-    @Override
-    public void onActivityResult(int requestCode, int resultCode, Intent data)
-    {
 
-
-        super.onActivityResult(requestCode, resultCode, data);
-        if (requestCode == REQUEST_ENABLE_PERMISSION)
-        {
-            if (!EasyPermissions.hasPermissions(this, permissions))
-            {
-
-                EasyPermissions.requestPermissions(this, "请打开所有权限，否则程序将无法正常运行",
-                        REQUEST_ENABLE_PERMISSION, permissions);
-            }
-            else
-            {
-                Toast.makeText(this, "已授权", Toast.LENGTH_SHORT).show();
-            }
-        }
-    }
-
+    //---------------------------------------------------------------蓝牙连接，推流相关-----------------------------------------------------
 
     public void bt_con2ble(View view)
     {
@@ -331,19 +346,14 @@ public class MainActivity extends AppCompatActivity implements EasyPermissions.P
     }
 
 
-    @Override
-    public void finish()
-    {
-        Intent intent = new Intent(this, BLEService.class);
-        unbindService(mServiceConnection);
-        super.finish();
-    }
-
     public void bt_stopPush(View view)
     {
         mControlBle.doMethod_stopPush();
     }
+
+
+    public void bt_startPush(View view)
+    {
+        mControlBle.doMethod_startPush();
+    }
 }
-
-
-

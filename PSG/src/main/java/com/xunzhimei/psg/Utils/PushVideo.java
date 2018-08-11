@@ -11,7 +11,6 @@ import android.view.Gravity;
 import android.view.SurfaceHolder;
 import android.view.SurfaceView;
 import android.view.WindowManager;
-import android.widget.Toast;
 
 import com.baidu.recorder.api.LiveSession;
 import com.baidu.recorder.api.LiveSessionSW;
@@ -32,8 +31,10 @@ public class PushVideo
     private LiveSession mLiveSession = null;
     private SessionStateListener mStateListener = null;
     private boolean mIsFRTM = false;
-    private boolean isSessionReady = false;
     private int mCurrentCamera = -1;
+
+    private boolean isSessionReady = false;
+    private boolean isPushing = false;
 
     //视频参数
     private int mVideoWidth = 1280;
@@ -41,7 +42,7 @@ public class PushVideo
     private int mFrameRate = 15;
     private int mBitrate = 2048000;
     private String mStreamingUrl = "rtmp://push.yiweiiot.com/game/room1";
-    //private String mStreamingUrl = "rtmp://play.yiweiiot.com/game/room1";
+    //播放URL "rtmp://play.yiweiiot.com/game/room1";
 
 
     //悬浮窗相关
@@ -51,12 +52,13 @@ public class PushVideo
 
     public PushVideo()
     {
+        //TODO
         mCurrentCamera = Camera.CameraInfo.CAMERA_FACING_BACK;
         initWindow();
         initRTMPSession(mSf.getHolder());
     }
 
-    //---------------------------------------------推流相关-------------------------------------------------
+    //由于推流需要在SurfaceView的显示中获取视频流，所以，必须要用一个界面来显示视频内容，显示后再进行推流。
     private void initWindow()
     {
         //①获得WindowManager对象:
@@ -65,7 +67,7 @@ public class PushVideo
         params = new WindowManager.LayoutParams();
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M)
         {//6.0
-//            params.type = WindowManager.LayoutParams.TYPE_APPLICATION_OVERLAY;
+            //params.type = WindowManager.LayoutParams.TYPE_APPLICATION_OVERLAY;
         }
         else
         {
@@ -86,8 +88,8 @@ public class PushVideo
         params.format = PixelFormat.RGBA_8888;
 
         // 设置悬浮框的宽高
-        params.width = 1;
-        params.height = 1;
+        params.width = 700;
+        params.height = 900;
 
         params.gravity = Gravity.LEFT;
         params.x = 200;
@@ -121,6 +123,7 @@ public class PushVideo
                     {
                         mVideoHeight = realHeight;
                         mVideoWidth = realWidth;
+                        System.out.println("PushVideo-->" + "onSessionPrepared:" + "   " + realWidth + "----" + realHeight);
                     }
                 }
             }
@@ -193,13 +196,13 @@ public class PushVideo
                         mWindowManager.addView(mSf, params);
                     }
                 });
-                android.util.Log.i(TAG, "bt_start: 开始传输视频流");
+                Log.i(TAG, "bt_start: 开始传输视频流");
             }
             mIsFRTM = true;
         }
         else
         {
-            android.util.Log.i(TAG, "bt_start: 推流正在进行请不要重复开始推流");
+            Log.i(TAG, "bt_start: 推流正在进行请不要重复开始推流");
         }
 
     }
@@ -211,7 +214,6 @@ public class PushVideo
         {
             if (mLiveSession.stopRtmpSession()) ;
             {
-
                 mWindowManager.removeView(mSf);
                 android.util.Log.i(TAG, "bt_end: 视频流传输，停止成功");
             }
@@ -234,23 +236,23 @@ public class PushVideo
                 {
                     mCurrentCamera = Camera.CameraInfo.CAMERA_FACING_FRONT;
                     mLiveSession.switchCamera(mCurrentCamera);
-                    android.util.Log.i(TAG, "onClickSwitchCamera: 正在使用前置摄像头");
+                    Log.i(TAG, "onClickSwitchCamera: 正在使用前置摄像头");
                 }
                 else
                 {
                     mCurrentCamera = Camera.CameraInfo.CAMERA_FACING_BACK;
                     mLiveSession.switchCamera(mCurrentCamera);
-                    android.util.Log.i(TAG, "onClickSwitchCamera: 正在使用后置摄像头");
+                    Log.i(TAG, "onClickSwitchCamera: 正在使用后置摄像头");
                 }
             }
             else
             {
-                android.util.Log.i(TAG, "onClickSwitchCamera: 抱歉！该分辨率下不支持切换摄像头");
+                Log.i(TAG, "onClickSwitchCamera: 抱歉！该分辨率下不支持切换摄像头");
             }
         }
         else
         {
-            Log.i(TAG, "onClickSwitchCamera: 推流没开始，你换摄像头没用");
+            Log.i(TAG, "onClickSwitchCamera: 推流没开始，你换摄像头也没用");
         }
     }
 }
