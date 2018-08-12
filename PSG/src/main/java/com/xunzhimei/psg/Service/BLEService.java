@@ -1,4 +1,3 @@
-
 package com.xunzhimei.psg.Service;
 
 import android.app.Service;
@@ -32,7 +31,6 @@ import es.dmoral.toasty.Toasty;
 
 public class BLEService extends Service
 {
-
     private static final String TAG = "BLEService";
 
     //蓝牙相关
@@ -44,11 +42,14 @@ public class BLEService extends Service
     private int mRssi;
     Handler mHandler = new Handler(Looper.getMainLooper());
 
+    private int CAN_NOTR_EAD_RSSI = 100;
+
     //时间差计算相关
     Date startDate = new Date();
 
     private SharedPreferences mSharedPreferences;
     private PushVideo mPushVideo;
+    private String macString;
 
 
     //-----------------------------------------生命周期方法---------------------------------------------
@@ -97,34 +98,39 @@ public class BLEService extends Service
 
 
     //连接当前配置的蓝牙
-    public void bt_cconnect()
+    public void BLEConnect()
     {
         //获取蓝牙地址
-        String macString = mSharedPreferences.getString(Constants.getMATCHDEVICE_MAC(), null);
+        macString = mSharedPreferences.getString(Constants.getMATCHDEVICE_MAC(), null);
         if (macString != null)
         {
             //连接逻辑
             // 蓝牙没有打开的时候，打开蓝牙
             if (!mBluetoothAdapter.isEnabled())
             {
-                mBluetoothAdapter.enable();
+                if (!mBluetoothAdapter.enable()) ;
+                {
+                    showToast("请打开手机蓝牙");
+                    return;
+                }
             }
+
             // 获取到远程设备，
             final BluetoothDevice device = mBluetoothAdapter.getRemoteDevice(macString.trim());
             if (mIsBLEconnected)
             {
-                showToast("当前蓝牙已连接，请勿重复连接设备");
+                showToast("当前蓝牙已连接");
             }
             else
             {
-                System.out.println("bt_cconnect" + "开始连接设备");
+                System.out.println("BLEConnect" + "开始连接设备");
                 // 开始连接，第二个参数表示是否需要自动连接，true设备靠近自动连接，第三个表示连接回调
                 mBluetoothGatt = device.connectGatt(getApplicationContext(), false, mGattCallback);
             }
         }
         else
         {
-            showToast("请先配置蓝牙设备");
+            showToast("请先绑定蓝牙设备");
         }
 
     }
@@ -132,7 +138,7 @@ public class BLEService extends Service
     //监听连接回调
     private final BluetoothGattCallback mGattCallback = new BluetoothGattCallback()
     {
-        // 连接状态变化
+        // 连接状态变发生变化
         @Override
         public void onConnectionStateChange(BluetoothGatt gatt, int status, int newState)
         {
@@ -140,16 +146,28 @@ public class BLEService extends Service
             {
                 boolean success = mBluetoothGatt.discoverServices(); // 去发现服务
                 System.out.println("BLEService-->" + "onConnectionStateChange" + "连接成功");
-                showToast("当前设备连接成功");
+                showToast("设备连接成功");
                 mIsBLEconnected = true;
             }
+
             else if (newState == BluetoothProfile.STATE_DISCONNECTED)
             {
-                // 连接断开
-                System.out.println("BLEService-->" + "onConnectionStateChange" + "连接不稳定，已经断开");
-                showToast("当前设备连接不稳定，已经断开");
+                if (status == 8)
+                {
+                    // 连接断开
+                    System.out.println("BLEService-->" + "onConnectionStateChange" + "连接不稳定，已经断开");
+                    showToast("信号不稳定|连接已断开");
+                }
+                if (status == 133)
+                {
+                    // 连接断开
+                    System.out.println("BLEService-->" + "onConnectionStateChange" + "蓝牙连接超时");
+                    showToast("蓝牙连接超时");
+                }
                 mIsBLEconnected = false;
             }
+
+            System.out.println("BLEService-->" + "onConnectionStateChange：" + status);
         }
 
         // 发现服务,在蓝牙连接的时候会调用
@@ -179,29 +197,6 @@ public class BLEService extends Service
                     enableNotification(true, gatt, alertLevel);//必须要有，否则接收不到数据
                 }
             }
-
-            //该线程中方法：mBluetoothGatt.readRemoteRssi(); 的调用会，触发蓝牙连接监听调用中的onReadRemoteRssi方法，以获取当前连接蓝牙的强度，
-            // 可以从强度反映出蓝牙设备离手机的距离
-//            new Thread(new Runnable()
-//            {
-//                @Override
-//                public void run()
-//                {
-//                    while (false)
-//                    {
-//                        try
-//                        {
-//                            System.out.println("run" + "================================");
-//                            Thread.sleep(100);
-//                            mBluetoothGatt.readRemoteRssi();
-//                        }
-//                        catch (InterruptedException e)
-//                        {
-//                            e.printStackTrace();
-//                        }
-//                    }
-//                }
-//            }).start();
 
 
         }
@@ -234,6 +229,7 @@ public class BLEService extends Service
             }
         }
 
+        //调用  mBluetoothGatt.readRemoteRssi() 方法的时候该方法会被执行
         @Override
         public void onReadRemoteRssi(BluetoothGatt gatt, int rssi, int status)
         {
@@ -295,7 +291,7 @@ public class BLEService extends Service
             mBluetoothGatt.close();
             mIsBLEconnected = false;
             System.out.println("Bledisconnect" + "当前蓝牙手动断开");
-            showToast("当前蓝牙手动断开");
+            showToast("蓝牙成功手动断开");
 
         }
         else
@@ -305,56 +301,68 @@ public class BLEService extends Service
     }
 
     //---------------------------------------------------------------Binder相关供Activity调用---------------------------------------------------------
-    //服务中的方法
-    public void Method_In_service()
+
+    public void methodInService()//内部类中的方法
     {
-//        Toast.makeText(getApplicationContext(), "方法调用成功", Toast.LENGTH_SHORT).show();
+        System.out.println("BLEService-->" + "methodInService" + " mBluetoothGatt.readRemoteRssi();" + mBluetoothGatt.readRemoteRssi());
     }
 
     //服务中继承于Binder的类Mybinder
     public class channel2Activity extends Binder
     {
-        public void doMethod_In_service()//内部类中的方法
+
+
+        public void doMethod_methodInService()//内部类中的方法
         {
-            Method_In_service();    //内部类中的方法调用服务中的方法
+            methodInService();
         }
 
-        public void doMethod_Bleconnection()//内部类中的方法
+        public void doMethod_Bleconnection()//蓝牙连接
         {
-            bt_cconnect();
+            BLEConnect();
         }
 
-        public void doMethod_Bledisconnect()//内部类中的方法
+        public void doMethod_Bledisconnect()//断开连接
         {
             Bledisconnect();
         }
 
-        public void doMethod_BLEAlarm()//内部类中的方法
+        public void doMethod_BLEAlarm()//硬件发声报警
         {
             BLEAlarm();
         }
 
-        public void doMethod_startPush()//内部类中的方法
+        public void doMethod_BLECancleAlarm()//取消硬件发声报警
+        {
+            BLECancleAlarm();
+        }
+
+        public void doMethod_startPush()//开始推流
         {
             mPushVideo.startPush();
         }
 
-        public void doMethod_stopPush()//内部类中的方法
+        public void doMethod_stopPush()//停止推流
         {
             mPushVideo.stopPush();
         }
 
-        public void doMethod_BLECancleAlarm()//内部类中的方法
-        {
-
-            BLECancleAlarm();
-        }
-
-        public void doMethod_switchCamera()//内部类中的方法
+        public void doMethod_switchCamera()//换摄像头
         {
             mPushVideo.switchCamera();
         }
 
+        public int doMethod_getRssi()//返回真：可以进行 继续RSSi获取工作。返回假：不能进行RSSI获取工作
+        {
+            if (mIsBLEconnected && mBluetoothGatt.readRemoteRssi())
+            {
+                return mRssi;
+            }
+            else
+            {
+                return CAN_NOTR_EAD_RSSI;
+            }
+        }
 
     }
 
@@ -396,4 +404,30 @@ public class BLEService extends Service
         return new String(hexChars);
     }
 
+    //该线程中方法：mBluetoothGatt.readRemoteRssi(); 的调用
+    // 会触发蓝牙连接监听调用中的 onReadRemoteRssi 方法，以获取当前连接蓝牙的强度，
+    // 可以从强度反映出蓝牙设备离手机的距离
+//    Thread thread = new Thread(new Runnable()
+//    {
+//        @Override
+//        public void run()
+//        {
+//            while (true)
+//            {
+//                try
+//                {
+//                    System.out.println("run" + "================================");
+//                    Thread.sleep(100);  //100ms更新一次 RSSI 数据
+//                    if (mBluetoothGatt != null)
+//                    {
+//                        mBluetoothGatt.readRemoteRssi();
+//                    }
+//                }
+//                catch (InterruptedException e)
+//                {
+//                    e.printStackTrace();
+//                }
+//            }
+//        }
+//    });
 }

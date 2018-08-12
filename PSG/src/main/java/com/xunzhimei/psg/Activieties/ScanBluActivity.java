@@ -43,6 +43,19 @@ import com.xunzhimei.psg.Utils.Constants;
 import java.util.ArrayList;
 import java.util.List;
 
+import es.dmoral.toasty.Toasty;
+
+/**
+ * Class  :ScanBluActivity
+ * Author :created by Vihan on 2018/8/12  17:46
+ * Email  :vihanmy@google.com
+ * Notes  :为防止用户蓝牙关闭导致的 蓝牙打开失败空指针崩溃
+ * 采用以下逻辑
+ * 【1】:用户在蓝牙未打开时进入该页面，直接finish该Activity，并弹出Toast
+ * 【2】:扫描过程中若用户关闭蓝牙，扫描5秒完成会提示用户蓝牙已经被手动关闭
+ * 【3】:在第二种情况下，用户再次下拉刷新扫描，会提示蓝牙未打开
+ **/
+
 public class ScanBluActivity extends AppCompatActivity
 {
     //蓝牙相关
@@ -63,64 +76,19 @@ public class ScanBluActivity extends AppCompatActivity
     private SwipeRefreshLayout.OnRefreshListener mRefreshListener;
 
     private SharedPreferences mSharedPreferences;
-
-    private ScanCallback mScanCallback = new ScanCallback()
-    {
-
-        //发现一个广播
-        @Override
-        public void onScanResult(int callbackType, ScanResult result)
-        {
-            byte[] scanRecord = result.getScanRecord().getBytes();
-            BluetoothDevice bluetoothDevice = result.getDevice();
-            int rssi = result.getRssi();
-
-            if (bluetoothDevice.getAddress().equals("90:59:AF:23:98:87"))
-            {
-                System.out.println("I got it! sir");
-            }
+    private ScanCallback mScanCallback = null;
 
 
-            if (!mLeDevices.contains(bluetoothDevice))
-            {
-                mLeDevices.add(bluetoothDevice);
-                mRSSIs.add(rssi);           //新加
-                mRecords.add(scanRecord);     //新加
-                System.out.println("---------------onLeScan");
-                System.out.println(":  device.getName(): " + bluetoothDevice.getName());
-                System.out.println(":  device.getAddress(): " + bluetoothDevice.getAddress());
-                System.out.println(": bluetoothDevice.getUuids(): " + bluetoothDevice.getUuids());
-                System.out.println(":  recorde: " + bytesToHex(scanRecord));
-                int positon = mLeDevices.size();
-                //显示插入动画
-                mAdapter.notifyItemInserted(positon);
-                //通知控件更新数据
-                mAdapter.notifyItemRangeChanged(positon, mLeDevices.size() - positon);
-            }
-
-        }
-
-        @Override
-        public void onBatchScanResults(List<ScanResult> results)
-        {
-            super.onBatchScanResults(results);
-        }
-
-        @Override
-        public void onScanFailed(int errorCode)
-        {
-            super.onScanFailed(errorCode);
-        }
-
-    };
-
+    //
     @Override
     protected void onCreate(Bundle savedInstanceState)
     {
         super.onCreate(savedInstanceState);
         setContentView(R.layout.activity_scan_blu);
+
         initBlueTooth();
         initView();
+        init();
         new Handler().postDelayed(new Runnable()
         {
             @Override
@@ -130,6 +98,69 @@ public class ScanBluActivity extends AppCompatActivity
                 mRefreshListener.onRefresh();
             }
         }, 100);
+    }
+
+    @Override
+    public boolean onOptionsItemSelected(MenuItem item)
+    {
+        if (item.getItemId() == android.R.id.home)
+        {
+            ScanBluActivity.this.finish();
+        }
+        return true;
+    }
+
+    //
+    private void init()
+    {
+        mScanCallback = new ScanCallback()
+        {
+            //发现一个广播
+            @Override
+            public void onScanResult(int callbackType, ScanResult result)
+            {
+                byte[] scanRecord = result.getScanRecord().getBytes();
+                BluetoothDevice bluetoothDevice = result.getDevice();
+                int rssi = result.getRssi();
+
+                if (bluetoothDevice.getAddress().equals("90:59:AF:23:98:87"))
+                {
+                    System.out.println("I got it! sir");
+                }
+
+                if (!mLeDevices.contains(bluetoothDevice))
+                {
+                    mLeDevices.add(bluetoothDevice);
+                    mRSSIs.add(rssi);           //新加
+                    mRecords.add(scanRecord);     //新加
+                    System.out.println("---------------onLeScan");
+                    System.out.println(":  device.getName(): " + bluetoothDevice.getName());
+                    System.out.println(":  device.getAddress(): " + bluetoothDevice.getAddress());
+                    System.out.println(": bluetoothDevice.getUuids(): " + bluetoothDevice.getUuids());
+                    System.out.println(":  recorde: " + bytesToHex(scanRecord));
+                    int positon = mLeDevices.size();
+                    //显示插入动画
+                    mAdapter.notifyItemInserted(positon);
+                    //通知控件更新数据
+                    mAdapter.notifyItemRangeChanged(positon, mLeDevices.size() - positon);
+                }
+            }
+
+            @Override
+            public void onBatchScanResults(List<ScanResult> results)
+            {
+                super.onBatchScanResults(results);
+            }
+
+            @Override
+            public void onScanFailed(int errorCode)
+            {
+                super.onScanFailed(errorCode);
+            }
+
+        };
+
+
     }
 
     private void initView()
@@ -147,6 +178,7 @@ public class ScanBluActivity extends AppCompatActivity
             //使Actionbar的HomeAsUp按键显示出来，默认不显示，默认作用是是返回上一个活动，默认图标是一个箭头
             actionBar.setDisplayHomeAsUpEnabled(true);
         }
+
         mRefreshListener = new SwipeRefreshLayout.OnRefreshListener() //下拉刷新动作的监听
         {
             @Override
@@ -178,65 +210,11 @@ public class ScanBluActivity extends AppCompatActivity
                 }).start();
             }
         };
+
         initRecyclerView();
         initSwipeRefresh();
     }
 
-    void saveMAC(String address, String name)
-    {
-
-        //获取针对 mSharedPreferences的这一个特定的对象的编辑对象
-        SharedPreferences.Editor spEditor = mSharedPreferences.edit();
-        spEditor.putString(Constants.getMATCHDEVICE_MAC(), address);
-        if (name == null)
-        {
-            spEditor.putString("NAME", "未命名设备");
-        }
-        else
-        {
-            spEditor.putString(Constants.getMATCHDEVICE_NAME(), name);
-        }
-        spEditor.commit(); //放入字符串后提交一下放入就存放进去了
-    }
-
-    private void showDiaglog(final int potion)
-    {
-        AlertDialog.Builder builder = new AlertDialog.Builder(ScanBluActivity.this);  //先得到构造器
-        builder.setTitle(mLeDevices.get(potion).getName()); //设置标题
-        builder.setMessage("这是您想要设置的安全设备吗？"); //设置内容
-        builder.setIcon(R.drawable.ic_launcher);//设置图标，图片id即可
-        builder.setPositiveButton("确定", new DialogInterface.OnClickListener()
-        { //设置确定按钮
-            @Override
-            public void onClick(DialogInterface dialog, int which)
-            {
-                saveMAC(mLeDevices.get(potion).getAddress(), mLeDevices.get(potion).getName());
-                dialog.dismiss(); //关闭dialog
-                Snackbar.make(mRv, "设备" + mLeDevices.get(potion).getName() + "已保存", Snackbar.LENGTH_LONG)
-                        .setAction("Action", null).show();
-            }
-        });
-
-
-        builder.setNegativeButton("取消", new DialogInterface.OnClickListener()
-        { //设置取消按钮
-            @Override
-            public void onClick(DialogInterface dialog, int which)
-            {
-                dialog.dismiss();
-            }
-        });
-        builder.setNeutralButton("忽略", new DialogInterface.OnClickListener()
-        {//设置忽略按钮
-            @Override
-            public void onClick(DialogInterface dialog, int which)
-            {
-                dialog.dismiss();
-            }
-        });
-//        参数都设置完成了，创建并显示出来
-        builder.create().show();
-    }
 
     private void initRecyclerView()
     {
@@ -263,13 +241,27 @@ public class ScanBluActivity extends AppCompatActivity
         mBluetoothAdapter = mBluetoothManager.getAdapter();
         if (!mBluetoothAdapter.isEnabled())
         {
-            mBluetoothAdapter.enable();
+            if (!mBluetoothAdapter.enable())
+                Toasty.error(getApplicationContext(), "蓝牙未打开,请手动打开后进入界面", Toast.LENGTH_SHORT);
+            finish();
         }
         mBluetoothLeScanner = mBluetoothAdapter.getBluetoothLeScanner();
     }
 
     public void ScanStart()
     {
+        if (!mBluetoothAdapter.isEnabled())
+        {
+            boolean flag = mBluetoothAdapter.enable();
+            if (!mBluetoothAdapter.enable())
+            {
+                Toasty.error(getApplicationContext(), "蓝牙打开失败，请手动打开蓝牙", Toast.LENGTH_SHORT).show();
+                mSwipeRefreshLayout.setRefreshing(false);    //去除，停止更新逻辑
+                return;
+            }
+        }
+
+        mBluetoothLeScanner = mBluetoothAdapter.getBluetoothLeScanner();
         mLeDevices.clear();
         mRSSIs.clear();
         mRecords.clear();
@@ -284,8 +276,22 @@ public class ScanBluActivity extends AppCompatActivity
                 try
                 {
                     Thread.sleep(5000);
-//                    mBluetoothAdapter.stopLeScan(leScanCallback);//停止扫描逻辑
-                    mBluetoothLeScanner.stopScan(mScanCallback);
+//                    mBluetoothAdapter.stopLeScan(leScanCallback);//停止扫描逻辑X
+                    if (!mBluetoothAdapter.isEnabled())
+                    {
+                        runOnUiThread(new Runnable()
+                        {
+                            @Override
+                            public void run()
+                            {
+                                Toasty.info(getApplicationContext(), "蓝牙已手动关闭", Toast.LENGTH_SHORT).show();
+                            }
+                        });
+                    }
+                    else
+                    {
+                        mBluetoothLeScanner.stopScan(mScanCallback);
+                    }
 
                     runOnUiThread(new Runnable()
                     {
@@ -401,7 +407,6 @@ public class ScanBluActivity extends AppCompatActivity
         }
     }
 
-
     //重写的间距类
     public class SpacesItemDecoration extends RecyclerView.ItemDecoration
     {
@@ -437,14 +442,59 @@ public class ScanBluActivity extends AppCompatActivity
         return new String(hexChars);
     }
 
-    @Override
-    public boolean onOptionsItemSelected(MenuItem item)
+    void saveMAC(String address, String name)
     {
-        if (item.getItemId() == android.R.id.home)
+        //获取针对 mSharedPreferences的这一个特定的对象的编辑对象
+        SharedPreferences.Editor spEditor = mSharedPreferences.edit();
+        spEditor.putString(Constants.getMATCHDEVICE_MAC(), address);
+        if (name == null)
         {
-            ScanBluActivity.this.finish();
+            spEditor.putString("NAME", "未命名设备");
         }
-        return true;
+        else
+        {
+            spEditor.putString(Constants.getMATCHDEVICE_NAME(), name);
+        }
+        spEditor.commit(); //放入字符串后提交一下放入就存放进去了
+    }
+
+    private void showDiaglog(final int potion)
+    {
+        AlertDialog.Builder builder = new AlertDialog.Builder(ScanBluActivity.this);  //先得到构造器
+        builder.setTitle(mLeDevices.get(potion).getName()); //设置标题
+        builder.setMessage("这是您想要设置的安全设备吗？"); //设置内容
+        builder.setIcon(R.drawable.ic_launcher);//设置图标，图片id即可
+        builder.setPositiveButton("确定", new DialogInterface.OnClickListener()
+        { //设置确定按钮
+            @Override
+            public void onClick(DialogInterface dialog, int which)
+            {
+                saveMAC(mLeDevices.get(potion).getAddress(), mLeDevices.get(potion).getName());
+                dialog.dismiss(); //关闭dialog
+                Snackbar.make(mRv, "设备" + mLeDevices.get(potion).getName() + "已保存", Snackbar.LENGTH_LONG)
+                        .setAction("Action", null).show();
+            }
+        });
+
+
+        builder.setNegativeButton("取消", new DialogInterface.OnClickListener()
+        { //设置取消按钮
+            @Override
+            public void onClick(DialogInterface dialog, int which)
+            {
+                dialog.dismiss();
+            }
+        });
+        builder.setNeutralButton("忽略", new DialogInterface.OnClickListener()
+        {//设置忽略按钮
+            @Override
+            public void onClick(DialogInterface dialog, int which)
+            {
+                dialog.dismiss();
+            }
+        });
+//        参数都设置完成了，创建并显示出来
+        builder.create().show();
     }
 
 

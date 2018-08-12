@@ -13,7 +13,7 @@ import com.xunzhimei.psg.R;
 
 public class WelcomActivity extends AppCompatActivity
 {
-    private boolean mIsTokenOk = false;
+    private boolean mIsTokenOk = true;
 
     @Override
     protected void onCreate(Bundle savedInstanceState)
@@ -31,7 +31,7 @@ public class WelcomActivity extends AppCompatActivity
             {
                 try
                 {
-                    sleep(2000);//使程序休眠1秒
+                    sleep(1000);//使程序休眠1秒
                     if (mIsTokenOk)
                     {
                         Intent intent = new Intent(getApplicationContext(), MainActivity.class);//启动MainActivity

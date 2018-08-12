@@ -63,9 +63,12 @@ public class MainActivity extends AppCompatActivity implements EasyPermissions.P
     private final int REQUEST_ENABLE_PERMISSION = 10;
 
 
-    //绑定服务
+    //绑定服务,与服务进行通信
     private ServiceConnection mServiceConnection;
     private BLEService.channel2Activity mControlBle;
+    private TextView mTv_Rssi;
+    private int mRssi;
+    private Thread mThread4ReadRssi;
 
 
     //-----------------------------------------------Activity固有方法-----------------------------------------
@@ -81,6 +84,7 @@ public class MainActivity extends AppCompatActivity implements EasyPermissions.P
         initViews();
         initUI();
         askPermission();
+
 //        SpeciaPermission();
     }
 
@@ -131,8 +135,8 @@ public class MainActivity extends AppCompatActivity implements EasyPermissions.P
                 startActivity(intent);
                 break;
 
-            case R.id.bt_Help:
-                Intent ntent = new Intent(getApplicationContext(), ScanBluActivity.class);
+            case R.id.bt_seting:
+                Intent ntent = new Intent(getApplicationContext(), SettingActivity.class);
                 startActivity(ntent);
                 break;
         }
@@ -175,6 +179,11 @@ public class MainActivity extends AppCompatActivity implements EasyPermissions.P
             {
                 System.out.println("MainActivity-->" + "onServiceConnected" + "");
                 mControlBle = (BLEService.channel2Activity) iBinder;
+                if (mControlBle != null)
+                {
+                    initThread2GetRssi();
+                    mThread4ReadRssi.start();  //在mThread4ReadRssi mControlBle 非空的情况下开启检测强度的线程
+                }
             }
 
             @Override
@@ -184,6 +193,59 @@ public class MainActivity extends AppCompatActivity implements EasyPermissions.P
             }
         };
         bindService(intent, mServiceConnection, BIND_AUTO_CREATE);
+
+
+    }
+
+    private void initThread2GetRssi()
+    {
+        //该线程中方法：mBluetoothGatt.readRemoteRssi(); 的调用
+        // 会触发蓝牙连接监听调用中的 onReadRemoteRssi 方法，以获取当前连接蓝牙的强度，
+        // 可以从强度反映出蓝牙设备离手机的距离
+        mThread4ReadRssi = new Thread(new Runnable()
+        {
+            @Override
+            public void run()
+            {
+                while (true)
+                {
+                    try
+                    {
+//                        System.out.println("run" + "================================");
+                        Thread.sleep(100);                 //100ms更新一次 RSSI 数据
+                        mRssi = mControlBle.doMethod_getRssi();
+
+                        if (mRssi == 100)  //bad
+                        {
+                            runOnUiThread(new Runnable()
+                            {
+                                @Override
+                                public void run()
+                                {
+                                    mTv_Rssi.setText("强度未知");
+                                }
+                            });
+                        }
+                        else
+                        {
+                            runOnUiThread(new Runnable()
+                            {
+                                @Override
+                                public void run()
+                                {
+                                    mTv_Rssi.setText("信号强度：" + mRssi);
+                                }
+                            });
+                        }
+                    }
+                    catch (InterruptedException e)
+                    {
+                        e.printStackTrace();
+                    }
+                }
+            }
+        });
+
     }
 
     private void initUI()
@@ -212,7 +274,9 @@ public class MainActivity extends AppCompatActivity implements EasyPermissions.P
         }
 
         mTv_confiState = (TextView) findViewById(R.id.tv_confiState);
+        mTv_Rssi = (TextView) findViewById(R.id.tv_rssi);
         mIv_confiState = (ImageView) findViewById(R.id.iv_confiState);
+
     }
 
 //    public void bt_BootCheck(View view)
@@ -245,7 +309,6 @@ public class MainActivity extends AppCompatActivity implements EasyPermissions.P
             }
             else
             {
-//                Toast.makeText(this, "已授权", Toast.LENGTH_SHORT).show();
                 System.out.println("MainActivity-->" + "askPermission" + "已授权");
             }
         }
@@ -331,12 +394,13 @@ public class MainActivity extends AppCompatActivity implements EasyPermissions.P
     public void bt_alarm(View view)
     {
 //        mControlBle.doMethod_stopPush();
-        mControlBle.doMethod_BLEAlarm();
+//        mControlBle.doMethod_BLEAlarm();
+        mControlBle.doMethod_methodInService();
     }
 
     public void bt_disConnect(View view)
     {
-//        mControlBle.doMethod_switchCamera();
+//      mControlBle.doMethod_switchCamera();
         mControlBle.doMethod_Bledisconnect();
     }
 
@@ -356,4 +420,6 @@ public class MainActivity extends AppCompatActivity implements EasyPermissions.P
     {
         mControlBle.doMethod_startPush();
     }
+
+
 }

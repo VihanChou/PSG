@@ -5,9 +5,9 @@
 
     <group android:checkableBehavior="single">
         <item
-            android:id="@+id/bt_Help"
-            android:icon="@drawable/ic_help_outline_black_24dp"
-            android:title="help"
+            android:id="@+id/bt_seting"
+            android:icon="@drawable/ic_settings_black_24dp"
+            android:title="setting"
             app:showAsAction="always"/>
         <item
             android:id="@+id/bt_ScanBlu"
