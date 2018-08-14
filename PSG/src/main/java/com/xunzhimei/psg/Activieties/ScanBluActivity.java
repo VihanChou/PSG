@@ -3,11 +3,7 @@ package com.xunzhimei.psg.Activieties;
 import android.app.AlertDialog;
 import android.bluetooth.BluetoothAdapter;
 import android.bluetooth.BluetoothDevice;
-import android.bluetooth.BluetoothGatt;
-import android.bluetooth.BluetoothGattCallback;
-import android.bluetooth.BluetoothGattCharacteristic;
 import android.bluetooth.BluetoothManager;
-import android.bluetooth.BluetoothProfile;
 import android.bluetooth.le.BluetoothLeScanner;
 import android.bluetooth.le.ScanCallback;
 import android.bluetooth.le.ScanResult;
@@ -50,7 +46,7 @@ import es.dmoral.toasty.Toasty;
  * Author :created by Vihan on 2018/8/12  17:46
  * Email  :vihanmy@google.com
  * Notes  :为防止用户蓝牙关闭导致的 蓝牙打开失败空指针崩溃
- * 采用以下逻辑
+ * A：蓝牙权限被拒绝访问时，采用以下逻辑
  * 【1】:用户在蓝牙未打开时进入该页面，直接finish该Activity，并弹出Toast
  * 【2】:扫描过程中若用户关闭蓝牙，扫描5秒完成会提示用户蓝牙已经被手动关闭
  * 【3】:在第二种情况下，用户再次下拉刷新扫描，会提示蓝牙未打开
@@ -65,7 +61,6 @@ public class ScanBluActivity extends AppCompatActivity
     private ArrayList<BluetoothDevice> mLeDevices = new ArrayList<BluetoothDevice>();
     private ArrayList<Integer> mRSSIs = new ArrayList<Integer>();
     private ArrayList<byte[]> mRecords = new ArrayList<byte[]>();
-
 
     //View 相关
     private Toolbar mTb;
@@ -159,8 +154,6 @@ public class ScanBluActivity extends AppCompatActivity
             }
 
         };
-
-
     }
 
     private void initView()
@@ -179,7 +172,16 @@ public class ScanBluActivity extends AppCompatActivity
             actionBar.setDisplayHomeAsUpEnabled(true);
         }
 
-        mRefreshListener = new SwipeRefreshLayout.OnRefreshListener() //下拉刷新动作的监听
+
+        initRecyclerView();
+        initSwipeRefresh();
+    }
+
+
+    private void initRecyclerView()
+    {
+        //下拉刷新动作的监听初始化
+        mRefreshListener = new SwipeRefreshLayout.OnRefreshListener()
         {
             @Override
             public void onRefresh()
@@ -203,7 +205,7 @@ public class ScanBluActivity extends AppCompatActivity
                             public void run()
                             {
                                 System.out.println("开始扫描");
-                                ScanStart();
+                                ScanStart(); //在ScanStart的内部计时扫描，扫描结束后进行结束刷新工作
                             }
                         });
                     }
@@ -211,13 +213,6 @@ public class ScanBluActivity extends AppCompatActivity
             }
         };
 
-        initRecyclerView();
-        initSwipeRefresh();
-    }
-
-
-    private void initRecyclerView()
-    {
         //获取recyclerView对象
         mRv = (RecyclerView) findViewById(R.id.Rv);
         //获取一个LinearLayoutManager对象，作为mRv.setLayoutManager(manager);的参数，给mRv用
@@ -250,24 +245,52 @@ public class ScanBluActivity extends AppCompatActivity
 
     public void ScanStart()
     {
-        if (!mBluetoothAdapter.isEnabled())
+        if (!mBluetoothAdapter.isEnabled())  //在检测到蓝牙没有打开的时候,尝试打开蓝牙
         {
             boolean flag = mBluetoothAdapter.enable();
-            if (!mBluetoothAdapter.enable())
+            System.out.println("ScanBluActivity-->" + "ScanStart" + "蓝牙打开的结果" + flag);
+            if (!flag)
             {
+                //打开蓝牙失败，直接提示用户，蓝牙打开失败
                 Toasty.error(getApplicationContext(), "蓝牙打开失败，请手动打开蓝牙", Toast.LENGTH_SHORT).show();
+                mSwipeRefreshLayout.setRefreshing(false);    //去除，停止更新逻辑
+                return;
+            }
+            else
+            {
+                //打开蓝牙成功
+                mBluetoothLeScanner = mBluetoothAdapter.getBluetoothLeScanner();
+                if (mBluetoothLeScanner == null) //
+                {
+                    System.out.println("ScanBluActivity-->" + "ScanStart" + "原本蓝牙没有打开，打开蓝牙成功后，mBluetoothLeScanner获取失败");
+                    Toasty.error(getApplicationContext(), "扫描失败，请重试", Toast.LENGTH_SHORT).show();
+                    mSwipeRefreshLayout.setRefreshing(false);    //去除，停止更新逻辑
+                    return;
+                }
+            }
+        }
+        else
+        {
+            //原本就打开了蓝牙
+            mBluetoothLeScanner = mBluetoothAdapter.getBluetoothLeScanner();
+            if (mBluetoothLeScanner == null) //
+            {
+                System.out.println("ScanBluActivity-->" + "ScanStart" + "原本就打开了蓝牙，mBluetoothLeScanner获取失败");
+                Toasty.error(getApplicationContext(), "扫描失败，请重试", Toast.LENGTH_SHORT).show();
                 mSwipeRefreshLayout.setRefreshing(false);    //去除，停止更新逻辑
                 return;
             }
         }
 
-        mBluetoothLeScanner = mBluetoothAdapter.getBluetoothLeScanner();
+
         mLeDevices.clear();
         mRSSIs.clear();
         mRecords.clear();
         UpdateRecyclerView();
-//        mBluetoothAdapter.startLeScan(leScanCallback);
+
+
         mBluetoothLeScanner.startScan(mScanCallback);
+        //开启线程，五秒后停止扫描
         new Thread(new Runnable()
         {
             @Override
@@ -276,7 +299,6 @@ public class ScanBluActivity extends AppCompatActivity
                 try
                 {
                     Thread.sleep(5000);
-//                    mBluetoothAdapter.stopLeScan(leScanCallback);//停止扫描逻辑X
                     if (!mBluetoothAdapter.isEnabled())
                     {
                         runOnUiThread(new Runnable()
@@ -291,6 +313,7 @@ public class ScanBluActivity extends AppCompatActivity
                     else
                     {
                         mBluetoothLeScanner.stopScan(mScanCallback);
+                        System.out.println("ScanBluActivity-->" + "run" + mScanCallback);
                     }
 
                     runOnUiThread(new Runnable()
@@ -462,7 +485,7 @@ public class ScanBluActivity extends AppCompatActivity
     {
         AlertDialog.Builder builder = new AlertDialog.Builder(ScanBluActivity.this);  //先得到构造器
         builder.setTitle(mLeDevices.get(potion).getName()); //设置标题
-        builder.setMessage("这是您想要设置的安全设备吗？"); //设置内容
+        builder.setMessage("这是您想要绑定的蓝牙设备吗？"); //设置内容
         builder.setIcon(R.drawable.ic_launcher);//设置图标，图片id即可
         builder.setPositiveButton("确定", new DialogInterface.OnClickListener()
         { //设置确定按钮
@@ -485,6 +508,7 @@ public class ScanBluActivity extends AppCompatActivity
                 dialog.dismiss();
             }
         });
+
         builder.setNeutralButton("忽略", new DialogInterface.OnClickListener()
         {//设置忽略按钮
             @Override

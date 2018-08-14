@@ -393,9 +393,7 @@ public class MainActivity extends AppCompatActivity implements EasyPermissions.P
 
     public void bt_alarm(View view)
     {
-//        mControlBle.doMethod_stopPush();
-//        mControlBle.doMethod_BLEAlarm();
-        mControlBle.doMethod_methodInService();
+        mControlBle.doMethod_BLEAlarm();
     }
 
     public void bt_disConnect(View view)
