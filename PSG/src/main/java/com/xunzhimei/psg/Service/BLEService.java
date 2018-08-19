@@ -21,6 +21,7 @@ import android.util.Log;
 import android.widget.Toast;
 
 import com.xunzhimei.psg.Utils.Constants;
+import com.xunzhimei.psg.Utils.NotifyMyPhone;
 import com.xunzhimei.psg.Utils.PushVideo;
 
 import java.util.Date;
@@ -36,34 +37,36 @@ import es.dmoral.toasty.Toasty;
  * Notes  :
  * 【1】关于蓝牙通信的条件
  * 蓝牙连接成功并不代表一定能够通信，
- * 只有蓝牙连接成功后，蓝牙服务也被找到的同时，才表示能够正常通信
+ * 只有蓝牙连接成功后，响应的蓝牙服务也被找到的同时，才表示能够正常通信
  **/
+
 
 public class BLEService extends Service
 {
     private static final String TAG = "BLEService";
-    int j = 0;
+    int mFindTimes = 0;
+
     //蓝牙相关
     private BluetoothAdapter mBluetoothAdapter;
     private BluetoothManager mBluetoothManager;
     private BluetoothLeScanner mBluetoothLeScanner;
     private BluetoothGatt mBluetoothGatt;
-    private boolean mIsBLE_Connected = false;    //蓝牙是否连接标志
-    private boolean mIsBLE_Finded = false;        //蓝牙服务是否查找到
-    private boolean isFinding = false;        //蓝牙服务是否查找到
+    private boolean mIsBLE_Connected = false;             //标志：蓝牙是否连接标志
+    private boolean mIsBLE_Finded = false;                //标志：蓝牙服务是否查找到
+    private boolean mIsFindingService = false;            //标志：蓝牙连接是否正在进行
+    private int mRssi;                                    //蓝牙信号强度
+    private int CAN_NOTR_EAD_RSSI = 100;                  //Rssi不可获取的标志
+    private String macString;                             //想要连接的蓝牙的Mac地址
 
-    private int mRssi;
-    Handler mHandler = new Handler(Looper.getMainLooper());
-
-    private int CAN_NOTR_EAD_RSSI = 100;
 
     //时间差计算相关
     Date startDate = new Date();
+    //toasty显示
+    private Handler mHandler = new Handler(Looper.getMainLooper());
 
-    private SharedPreferences mSharedPreferences;
-    private PushVideo mPushVideo;
-    private String macString;
-
+    private SharedPreferences mSharedPreferences;//SP
+    private PushVideo mPushVideo;   //推流
+    private NotifyMyPhone mNotifyMyPhone; //通知
 
     //-----------------------------------------生命周期方法---------------------------------------------
     public BLEService()
@@ -71,11 +74,9 @@ public class BLEService extends Service
         System.out.println("BLEService-->" + "BLEService" + "服务已经开启");
     }
 
-
     @Override
     public IBinder onBind(Intent intent)
     {
-        // TODO: Return the communication channel to the service.
         return new channel2Activity();
     }
 
@@ -83,30 +84,31 @@ public class BLEService extends Service
     public int onStartCommand(Intent intent, int flags, int startId)
     {
         initBlueTooth();
-        mPushVideo = new PushVideo();
+        initMedia();
         return super.onStartCommand(intent, flags, startId);
     }
 
     @Override
     public void onDestroy()
     {
-        System.out.println("BLEService-->" + "onDestroy" + "");
+        System.out.println("BLEService-->" + "onDestroy" + "服务已销毁");
         super.onDestroy();
     }
 
+    //-------------------------------多媒体，震动，发声---------------------------------------------------------
+    private void initMedia()
+    {
+        mPushVideo = new PushVideo();
+        mNotifyMyPhone = new NotifyMyPhone();
+    }
 
     //------------------------------------蓝牙相关---------------------------------------------------------
     //蓝牙初始化
     private void initBlueTooth()
     {
-        //1首先获取BluetoothManager
         mBluetoothManager = (BluetoothManager) getSystemService(Context.BLUETOOTH_SERVICE);
-        //2获取BluetoothAdapter,并打开蓝牙
         mBluetoothAdapter = mBluetoothManager.getAdapter();
-        //蓝牙扫描类
         mBluetoothLeScanner = mBluetoothAdapter.getBluetoothLeScanner();
-
-        //第一个参数是保存在哪一个xml文件中，第二个参数是操作模式，一般选择 MODE_PRIVATE
         mSharedPreferences = getSharedPreferences(Constants.getSPFILENAME(), Context.MODE_PRIVATE);
     }
 
@@ -117,31 +119,29 @@ public class BLEService extends Service
         @Override
         public void onConnectionStateChange(BluetoothGatt gatt, int status, int newState)
         {
-            System.out.println("BLEService-->" + "status：" + status);
-            System.out.println("BLEService-->" + "newState：" + newState);
+            System.out.println("BLEService-->" + "status：" + status + "   newState：" + newState);
 
-            if (newState == BluetoothProfile.STATE_CONNECTED)// 连接上
+            if (newState == BluetoothProfile.STATE_CONNECTED)               // 连接上
             {
                 mIsBLE_Connected = true;
                 System.out.println("BLEService-->" + "onConnectionStateChange" + "连接已准备");
                 FindService();
             }
-            else if (newState == BluetoothProfile.STATE_DISCONNECTED)
+            else if (newState == BluetoothProfile.STATE_DISCONNECTED)      //连接蓝牙的时候没有连接上蓝牙，或者连接好的蓝牙被断开
             {
                 System.out.println("BLEService-->" + "onConnectionStateChange" + "蓝牙断开 status =  " + status);
-                if (status == 8)
+                if (status == 8)//连接好
                 {
-                    // 连接断开
                     System.out.println("BLEService-->" + "onConnectionStateChange" + "连接不稳定，已经断开");
                     showToast("信号不稳定|连接已断开");
                 }
                 if (status == 133)
                 {
-                    // 连接断开
                     System.out.println("BLEService-->" + "onConnectionStateChange" + "蓝牙连接超时");
                     showToast("蓝牙连接超时");
                 }
-                isFinding = false;
+
+                mIsFindingService = false;
                 mIsBLE_Connected = false;
             }
         }
@@ -150,8 +150,8 @@ public class BLEService extends Service
         @Override
         public void onServicesDiscovered(BluetoothGatt gatt, int status)
         {
-            j++;
-            System.out.println("BLEService-->" + "onServicesDiscovered" + "开始发现服务" + j);
+            mFindTimes++;
+            System.out.println("BLEService-->" + "onServicesDiscovered" + "开始发现服务" + mFindTimes);
             if (status == BluetoothGatt.GATT_SUCCESS && mIsBLE_Connected == true && mIsBLE_Finded == false)
             {
                 BluetoothGattCharacteristic bluetoothGattCharacteristic = null;
@@ -170,10 +170,12 @@ public class BLEService extends Service
                         if (Constants.getReceiBleDataCharecUuid().equals(gattCharacteristic.getUuid().toString()))
                         {
                             bluetoothGattCharacteristic = gattCharacteristic;
-                            Log.e("onServicesDiscovered", bluetoothGattCharacteristic.getUuid().toString());
-                            enableNotification(true, gatt, bluetoothGattCharacteristic);//必须要有，否则接收不到数据
+                            Log.e("onServicesDiscovered-", bluetoothGattCharacteristic.getUuid().toString());
+
+                            enableNotification(true, gatt, bluetoothGattCharacteristic);
                             //蓝牙连接成功并能够通信的真正标志
-                            showToast("蓝牙连接成功啦！！！！！");
+                            showToast("蓝牙连接成功啦！！");
+
                             mIsBLE_Finded = true;
                             return;
                         }
@@ -206,6 +208,7 @@ public class BLEService extends Service
             else
             {
                 //TODO 单击逻辑
+                mNotifyMyPhone.nowNotifyMyPhone(500);
                 showToast("单击");
             }
         }
@@ -215,9 +218,9 @@ public class BLEService extends Service
         public void onReadRemoteRssi(BluetoothGatt gatt, int rssi, int status)
         {
             System.out.println("onReadRemoteRssi" + "");
-            mRssi = rssi;
             if (status == BluetoothGatt.GATT_SUCCESS)
             {
+                mRssi = rssi;
                 //TODO 获取蓝牙信号强度
             }
             super.onReadRemoteRssi(gatt, rssi, status);
@@ -225,27 +228,20 @@ public class BLEService extends Service
 
     };
 
-    //查找连接服务
+    //在蓝牙连接成功后查找连接服务
     private void FindService()
     {
         System.out.println("BLEService-->" + "FindService" + ":" + mIsBLE_Finded);
-        int i = 1000;
+        int i = 10;   //由于在ViVoX21手机测试的时候存在 执行了 mBluetoothGatt.discoverServices();方法后，异步
         while (i > 0)
         {
-            if (!mIsBLE_Finded)  //如果服务发现失败
+            if (!mIsBLE_Finded)  //如果服务发现失败,继续执行discoverServices方法
             {
-
                 i--;
-                if (mBluetoothGatt.discoverServices())
-                {
-                    System.out.println("BLEService-->" + "尝试次数:" + i);
-                }
-                else
-                {
-//                            System.out.println("BLEService-->" + "尝试次数:" + i);
-                }
+                mBluetoothGatt.discoverServices();
+                System.out.println("BLEService-->" + "尝试次数:" + i);
             }
-            else //在1000次的尝试中，服务发现成功了
+            else //在10次的尝试中，存在某次服务发现成功了
             {
                 i = -1;
             }
@@ -271,11 +267,8 @@ public class BLEService extends Service
                         }
                         showToast("连接失败，请重试！");
                     }
-                    else
-                    {
-//            showToast("连接成功！");
-                    }
-                    isFinding = false;
+
+                    mIsFindingService = false;
 
                 }
                 catch (InterruptedException e)
@@ -300,10 +293,10 @@ public class BLEService extends Service
         }
     }
 
-    //连接当前配置的蓝牙
+    //连接蓝牙
     public void BLEConnect()
     {
-        j = 0;
+        mFindTimes = 0;
         //获取蓝牙地址
         macString = mSharedPreferences.getString(Constants.getMATCHDEVICE_MAC(), null);
         if (macString != null)
@@ -327,8 +320,7 @@ public class BLEService extends Service
             }
             else
             {
-                System.out.println("BLEConnect" + "开始连接设备");
-                isFinding = true;
+                mIsFindingService = true;
                 // 开始连接，第二个参数表示是否需要自动连接，true设备靠近自动连接，第三个表示连接回调
                 mBluetoothGatt = device.connectGatt(getApplicationContext(), false, mGattCallback);
             }
@@ -340,10 +332,10 @@ public class BLEService extends Service
 
     }
 
-    //断开连接
+    //断开蓝牙连接
     public void Bledisconnect()
     {
-        if (isFinding)
+        if (mIsFindingService)
         {
             showToast("请等待连接完成");
         }
@@ -367,8 +359,7 @@ public class BLEService extends Service
         }
     }
 
-
-    //蓝牙发送信息，使智能硬件发声报警
+    //蓝牙发送信息，使外围设备发声报警
     public void BLEAlarm()
     {
         if (mBluetoothGatt != null && mIsBLE_Connected && mIsBLE_Finded)
@@ -385,7 +376,7 @@ public class BLEService extends Service
         }
     }
 
-    //蓝牙发送信息，使智能硬件取消发声报警
+    //蓝牙发送信息，使外围设备取消发声报警
     public void BLECancleAlarm()
     {
         if (mBluetoothGatt != null && mIsBLE_Connected && mIsBLE_Finded)
@@ -399,18 +390,15 @@ public class BLEService extends Service
         }
     }
 
-
-    //---------------------------------------------------------------Binder相关供Activity调用---------------------------------------------------------
+    //---------------------------------------------------------------通过channel2Activity提供给Activity的方法---------------------------------------------------------
     public void methodInService()//内部类中的方法
     {
-        System.out.println("BLEService-->" + "methodInService" + " mBluetoothGatt.readRemoteRssi();" + mBluetoothGatt.readRemoteRssi());
+
     }
 
-    //服务中继承于Binder的类Mybinder
+    //服务中继承于Binder的类channel2Activity
     public class channel2Activity extends Binder
     {
-
-
         public void doMethod_methodInService()//内部类中的方法
         {
             methodInService();
@@ -451,7 +439,7 @@ public class BLEService extends Service
             mPushVideo.switchCamera();
         }
 
-        public int doMethod_getRssi()//返回真：可以进行 继续RSSi获取工作。返回假：不能进行RSSI获取工作
+        public int doMethod_getRssi()//Activity 可以通过不间断的通过Binder访问该方法来获取去Rssi，前提是蓝牙连接成功的情况下
         {
             if (mIsBLE_Connected && mIsBLE_Finded && mBluetoothGatt.readRemoteRssi())
             {
@@ -501,31 +489,4 @@ public class BLEService extends Service
         }
         return new String(hexChars);
     }
-
-    //该线程中方法：mBluetoothGatt.readRemoteRssi(); 的调用
-    // 会触发蓝牙连接监听调用中的 onReadRemoteRssi 方法，以获取当前连接蓝牙的强度，
-    // 可以从强度反映出蓝牙设备离手机的距离
-//    Thread thread = new Thread(new Runnable()
-//    {
-//        @Override
-//        public void run()
-//        {
-//            while (true)
-//            {
-//                try
-//                {
-//                    System.out.println("run" + "================================");
-//                    Thread.sleep(100);  //100ms更新一次 RSSI 数据
-//                    if (mBluetoothGatt != null)
-//                    {
-//                        mBluetoothGatt.readRemoteRssi();
-//                    }
-//                }
-//                catch (InterruptedException e)
-//                {
-//                    e.printStackTrace();
-//                }
-//            }
-//        }
-//    });
 }

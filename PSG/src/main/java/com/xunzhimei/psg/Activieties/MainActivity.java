@@ -54,6 +54,14 @@ public class MainActivity extends AppCompatActivity implements EasyPermissions.P
     private TextView mTv_confiState;
     private SharedPreferences mSharedPreferences;
 
+    //绑定服务,与服务进行通信
+    private ServiceConnection mServiceConnection;
+    private BLEService.channel2Activity mControlBle;
+    private TextView mTv_Rssi;
+    private int mRssi;
+    private Thread mThread4ReadRssi;
+
+
     //动态权限申请
     private String[] permissions = {
             Manifest.permission.ACCESS_COARSE_LOCATION,
@@ -61,14 +69,6 @@ public class MainActivity extends AppCompatActivity implements EasyPermissions.P
             Manifest.permission.READ_EXTERNAL_STORAGE,
             Manifest.permission.CAMERA};
     private final int REQUEST_ENABLE_PERMISSION = 10;
-
-
-    //绑定服务,与服务进行通信
-    private ServiceConnection mServiceConnection;
-    private BLEService.channel2Activity mControlBle;
-    private TextView mTv_Rssi;
-    private int mRssi;
-    private Thread mThread4ReadRssi;
 
 
     //-----------------------------------------------Activity固有方法-----------------------------------------
@@ -193,8 +193,6 @@ public class MainActivity extends AppCompatActivity implements EasyPermissions.P
             }
         };
         bindService(intent, mServiceConnection, BIND_AUTO_CREATE);
-
-
     }
 
     private void initThread2GetRssi()
@@ -278,21 +276,6 @@ public class MainActivity extends AppCompatActivity implements EasyPermissions.P
         mIv_confiState = (ImageView) findViewById(R.id.iv_confiState);
 
     }
-
-//    public void bt_BootCheck(View view)
-//    {
-//        if (mBoot_Flag)
-//        {
-//            mBt_bootCheck.setBackground(getDrawable(R.drawable.mainbuttonshape));
-//        }
-//        else
-//        {
-//            mBt_bootCheck.setBackground(getDrawable(R.drawable.mainbuttonshapegreen));
-//        }
-//        mBoot_Flag = !mBoot_Flag;
-//
-//    }
-
 
     //-----------------------------------------------------权限申请相关----------------------------------------------------------------
     public void askPermission()
@@ -382,12 +365,9 @@ public class MainActivity extends AppCompatActivity implements EasyPermissions.P
         Log.i("ble", "获取失败的权限" + perms);
     }
 
-
-    //---------------------------------------------------------------蓝牙连接，推流相关-----------------------------------------------------
-
+    //---------------------------------------------------------------蓝牙连接，推流,服务相关-----------------------------------------------------
     public void bt_con2ble(View view)
     {
-//        mControlBle.doMethod_startPush();
         mControlBle.doMethod_Bleconnection();
     }
 
@@ -398,7 +378,6 @@ public class MainActivity extends AppCompatActivity implements EasyPermissions.P
 
     public void bt_disConnect(View view)
     {
-//      mControlBle.doMethod_switchCamera();
         mControlBle.doMethod_Bledisconnect();
     }
 
@@ -407,17 +386,19 @@ public class MainActivity extends AppCompatActivity implements EasyPermissions.P
         mControlBle.doMethod_BLECancleAlarm();
     }
 
-
     public void bt_stopPush(View view)
     {
         mControlBle.doMethod_stopPush();
     }
-
 
     public void bt_startPush(View view)
     {
         mControlBle.doMethod_startPush();
     }
 
+    public void bt_test(View view)
+    {
+        mControlBle.doMethod_methodInService();
+    }
 
 }

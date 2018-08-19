@@ -16,18 +16,17 @@
         >
     </android.support.v7.widget.Toolbar>
 
-    <LinearLayout
+    <Button
         android:layout_width="match_parent"
-        android:layout_height="10dp"
-        android:gravity="center">
-
-
-    </LinearLayout>
+        android:layout_height="wrap_content"
+        android:text="测试"
+        android:onClick="bt_test"
+        />
 
     <RelativeLayout
 
         android:layout_width="match_parent"
-        android:layout_height="match_parent"
+        android:layout_height="wrap_content"
         android:paddingBottom="10dp">
 
 
